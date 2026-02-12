@@ -1,37 +1,45 @@
 import pandas as pd
 
 def main():
-    # Load the three CSV files
     files = [
         "data/daily_sales_data_0.csv",
         "data/daily_sales_data_1.csv",
         "data/daily_sales_data_2.csv",
     ]
 
-    # Read each CSV into a table (DataFrame)
-    tables = []
-    for f in files:
-        tables.append(pd.read_csv(f))
+    dfs = [pd.read_csv(f) for f in files]
+    df = pd.concat(dfs, ignore_index=True)
 
-    # Combine (stack) the three tables into one
-    df = pd.concat(tables, ignore_index=True)
+    # Clean fields (strip spaces)
+    df["product"] = df["product"].astype(str).str.strip()
+    df["region"] = df["region"].astype(str).str.strip()
 
-    # Keep only rows where product is pink morsels
-    df = df[df["product"] == "pink morsels"].copy()
+    # Keep only pink morsel (singular in your data)
+    df = df[df["product"] == "pink morsel"].copy()
 
-    # Create sales = quantity * price
+    # Convert price from "$3.00" -> 3.00
+    df["price"] = df["price"].astype(str).str.replace("$", "", regex=False).astype(float)
+
+    # Ensure quantity is numeric
+    df["quantity"] = df["quantity"].astype(int)
+
+    # Compute sales
     df["sales"] = df["quantity"] * df["price"]
 
-    # Keep only sales, date, region
+    # Output only required columns
     out = df[["sales", "date", "region"]].copy()
-
-    # Rename columns to match the required output fields
     out.columns = ["Sales", "Date", "Region"]
 
-    # Save the final output file in the repo root
-    out.to_csv("formatted_sales.csv", index=False)
+    # Put regions in a custom order, then sort
+    region_order = ["north", "south", "east", "west"]
+    out["Region"] = out["Region"].astype(str).str.strip()
+    out["Region"] = pd.Categorical(out["Region"], categories=region_order, ordered=True)
 
-    print("Done! Created formatted_sales.csv")
+    # Sort by Region first (custom order), then by Date
+    out = out.sort_values(["Region", "Date"])
+
+    out.to_csv("formatted_sales.csv", index=False)
+    print(f"Done! Wrote {len(out)} rows to formatted_sales.csv")
 
 if __name__ == "__main__":
     main()
